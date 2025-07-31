@@ -64,7 +64,7 @@ stage('Build and Push Docker Image') {
 
     withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
       sh '''
-        git config user.email "prakashpotnuru11@gmail.com"
+        git config user.email "potnuruvenkat11@gmail.com"
         git config user.name "prakashpotnuru11"
 
         sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
