@@ -2,7 +2,7 @@
 pipeline {
   agent {
     docker {
-      image 'prakashpotnuru11/java11-git-docker-agent:v1'
+      image 'prakashpotnuru11/java11-git-docker-agent:v2'
       args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
     }
   }
