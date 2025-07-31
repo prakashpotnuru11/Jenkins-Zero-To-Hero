@@ -1,8 +1,8 @@
 pipeline {
   agent {
     docker {
-      image 'prakashpotnuru11/java17-maven-docker-agent:v1' // Java 17 + Maven + Docker
-      args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // Mount Docker socket
+      image 'prakashpotnuru11/java11-git-docker-agent:v1'
+      args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
     }
   }
 
