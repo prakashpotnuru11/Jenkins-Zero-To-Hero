@@ -16,7 +16,7 @@ pipeline {
             steps {
                 // Checkout with explicit GitHub token credentials for authentication
                 git branch: 'main',
-                    url: 'https://github.com/prakashpotnuru11/java-maven-sonar-argocd-helm-k8s.git',
+                    url: 'https://github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git',
                     credentialsId: 'github1'
             }
         }
@@ -61,7 +61,7 @@ pipeline {
                         git add k8s/deployment.yaml
                         git commit -m "Updated image to v${BUILD_NUMBER}"
 
-                        git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/prakashpotnuru11/java-maven-sonar-argocd-helm-k8s.git
+                        git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git
 
                         git push origin main
                     """
