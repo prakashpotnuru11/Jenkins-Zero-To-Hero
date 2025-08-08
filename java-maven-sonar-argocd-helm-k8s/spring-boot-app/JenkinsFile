@@ -8,7 +8,7 @@ pipeline {
     environment {
         SONAR_TOKEN = credentials('sonar-token')     // SonarQube token credential ID
         GIT_USER_NAME = 'prakashpotnuru11'
-        GIT_USER_EMAIL = 'potnuruvenkat11@gmail.com'    // Replace with your Git email
+        GIT_USER_EMAIL = 'potnuruvenkat11@gmail.com'    // Your Git email
     }
 
     stages {
@@ -23,27 +23,31 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                sh """
-                    mvn clean verify sonar:sonar \
-                        -Dsonar.projectKey=spring-boot-demo \
-                        -Dsonar.host.url=http://13.234.110.156:9000 \
-                        -Dsonar.login=$SONAR_TOKEN
-                """
+                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
+                    sh """
+                        mvn clean verify sonar:sonar \
+                            -Dsonar.projectKey=spring-boot-demo \
+                            -Dsonar.host.url=http://13.234.110.156:9000 \
+                            -Dsonar.login=$SONAR_TOKEN
+                    """
+                }
             }
         }
 
         stage('Build and Push Docker Image') {
             steps {
-                withCredentials([string(credentialsId: 'github1', variable: 'GITHUB_TOKEN')]) {
-                    script {
-                        def imageName = "prakashpotnuru11/spring-boot-demo"
-                        def imageTag = "v${BUILD_NUMBER}"
+                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
+                    withCredentials([string(credentialsId: 'github1', variable: 'GITHUB_TOKEN')]) {
+                        script {
+                            def imageName = "prakashpotnuru11/spring-boot-demo"
+                            def imageTag = "v${BUILD_NUMBER}"
 
-                        sh """
-                            docker build -t ${imageName}:${imageTag} .
-                            echo "$GITHUB_TOKEN" | docker login ghcr.io -u $GIT_USER_NAME --password-stdin
-                            docker push ${imageName}:${imageTag}
-                        """
+                            sh """
+                                docker build -t ${imageName}:${imageTag} .
+                                echo "$GITHUB_TOKEN" | docker login ghcr.io -u $GIT_USER_NAME --password-stdin
+                                docker push ${imageName}:${imageTag}
+                            """
+                        }
                     }
                 }
             }
@@ -51,20 +55,22 @@ pipeline {
 
         stage('Update Deployment File and Push to GitHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'github1', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                    sh """
-                        sed -i 's|image: .*|image: prakashpotnuru11/spring-boot-demo:v${BUILD_NUMBER}|' k8s/deployment.yaml
+                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
+                    withCredentials([usernamePassword(credentialsId: 'github1', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        sh """
+                            sed -i 's|image: .*|image: prakashpotnuru11/spring-boot-demo:v${BUILD_NUMBER}|' k8s/deployment.yaml
 
-                        git config --global user.email "$GIT_USER_EMAIL"
-                        git config --global user.name "$GIT_USER_NAME"
+                            git config --global user.email "$GIT_USER_EMAIL"
+                            git config --global user.name "$GIT_USER_NAME"
 
-                        git add k8s/deployment.yaml
-                        git commit -m "Updated image to v${BUILD_NUMBER}"
+                            git add k8s/deployment.yaml
+                            git commit -m "Updated image to v${BUILD_NUMBER}"
 
-                        git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git
+                            git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git
 
-                        git push origin main
-                    """
+                            git push origin main
+                        """
+                    }
                 }
             }
         }
