@@ -17,7 +17,7 @@ pipeline {
                 // Checkout with explicit GitHub token credentials for authentication
                 git branch: 'main',
                     url: 'https://github.com/prakashpotnuru11/java-maven-sonar-argocd-helm-k8s.git',
-                    credentialsId: 'github'
+                    credentialsId: 'github1'
             }
         }
 
@@ -34,7 +34,7 @@ pipeline {
 
         stage('Build and Push Docker Image') {
             steps {
-                withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+                withCredentials([string(credentialsId: 'github1', variable: 'GITHUB_TOKEN')]) {
                     script {
                         def imageName = "prakashpotnuru11/spring-boot-demo"
                         def imageTag = "v${BUILD_NUMBER}"
@@ -51,7 +51,7 @@ pipeline {
 
         stage('Update Deployment File and Push to GitHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                withCredentials([usernamePassword(credentialsId: 'github1', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
                     sh """
                         sed -i 's|image: .*|image: prakashpotnuru11/spring-boot-demo:v${BUILD_NUMBER}|' k8s/deployment.yaml
 
