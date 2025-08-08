@@ -9,7 +9,6 @@ pipeline {
         SONAR_TOKEN = credentials('sonar-token')     // SonarQube token credential ID
         GIT_USER_NAME = 'prakashpotnuru11'
         GIT_USER_EMAIL = 'potnuruvenkat11@gmail.com'    // Replace with your Git email
-        // For git clone and push, we'll inject these below inside withCredentials for better secret handling
     }
 
     stages {
@@ -24,11 +23,10 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // Use SONAR_TOKEN environment variable directly here
                 sh """
                     mvn clean verify sonar:sonar \
                         -Dsonar.projectKey=spring-boot-demo \
-                        -Dsonar.host.url=http:http://13.234.110.156:9000 \
+                        -Dsonar.host.url=http://13.234.110.156:9000 \
                         -Dsonar.login=$SONAR_TOKEN
                 """
             }
@@ -36,7 +34,7 @@ pipeline {
 
         stage('Build and Push Docker Image') {
             steps {
-                withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
                     script {
                         def imageName = "prakashpotnuru11/spring-boot-demo"
                         def imageTag = "v${BUILD_NUMBER}"
@@ -53,7 +51,7 @@ pipeline {
 
         stage('Update Deployment File and Push to GitHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
                     sh """
                         sed -i 's|image: .*|image: prakashpotnuru11/spring-boot-demo:v${BUILD_NUMBER}|' k8s/deployment.yaml
 
@@ -63,7 +61,6 @@ pipeline {
                         git add k8s/deployment.yaml
                         git commit -m "Updated image to v${BUILD_NUMBER}"
 
-                        # Set remote URL with authentication to push changes
                         git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/prakashpotnuru11/java-maven-sonar-argocd-helm-k8s.git
 
                         git push origin main
