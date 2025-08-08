@@ -20,6 +20,11 @@ pipeline {
                     credentialsId: 'github1'
             }
         }
+    stage('Clean Workspace') {
+        steps {
+            deleteDir() // Clean up workspace before build starts
+        }
+    }
 
         stage('SonarQube Analysis') {
             steps {
