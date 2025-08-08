@@ -18,7 +18,7 @@ pipeline {
                 // Checkout with explicit GitHub token credentials for authentication
                 git branch: 'main',
                     url: 'https://github.com/prakashpotnuru11/java-maven-sonar-argocd-helm-k8s.git',
-                    credentialsId: 'github-token'
+                    credentialsId: 'github'
             }
         }
 
