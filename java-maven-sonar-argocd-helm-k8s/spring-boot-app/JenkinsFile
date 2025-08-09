@@ -1,82 +1,61 @@
 pipeline {
-    agent {
-        docker {
-            image 'prakashpotnuru11/java17-git-docker-agent:v3'
-            args '-v /var/jenkins_home/.m2:/root/.m2' // Maven cache for speed
-        }
-    }
+    agent any
 
-    options {
-        skipDefaultCheckout(true) // Prevents default SCM checkout
+    tools {
+        maven 'Maven'  // Name from Jenkins Global Tool Configuration
+        jdk 'Java 17' // Adjust based on your setup
     }
 
     environment {
-        SONAR_TOKEN   = credentials('sonar-token')     // SonarQube token credential ID
-        GIT_USER_NAME = 'prakashpotnuru11'
-        GIT_USER_EMAIL = 'potnuruvenkat11@gmail.com'
+        SONARQUBE_TOKEN = credentials('sonarqube-token') // Jenkins credentials ID for SonarQube token
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git',
-                    credentialsId: 'github1'
+                git branch: 'main', url: 'https://github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean install'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
-                    sh '''
-                        mvn clean verify sonar:sonar \
-                            -Dsonar.projectKey=spring-boot-demo \
-                            -Dsonar.host.url=http://13.233.215.8:9000 \
-                            -Dsonar.login=$SONAR_TOKEN
-                    '''
+                withSonarQubeEnv('My SonarQube Server') { // Name from Jenkins SonarQube configuration
+                    sh """
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=spring-boot-app \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.login=${SONARQUBE_TOKEN}
+                    """
                 }
             }
         }
 
-        stage('Build and Push Docker Image') {
+        stage('Quality Gate') {
             steps {
-                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
-                    withCredentials([string(credentialsId: 'github1', variable: 'GITHUB_TOKEN')]) {
-                        script {
-                            def imageName = "prakashpotnuru11/spring-boot-demo"
-                            def imageTag = "v${BUILD_NUMBER}"
-
-                            sh """
-                                docker build -t ${imageName}:${imageTag} .
-                                echo "${GITHUB_TOKEN}" | docker login ghcr.io -u ${GIT_USER_NAME} --password-stdin
-                                docker push ${imageName}:${imageTag}
-                            """
-                        }
-                    }
+                timeout(time: 1, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        stage('Update Deployment File and Push to GitHub') {
+        stage('Docker Build & Push') {
             steps {
-                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
-                    withCredentials([usernamePassword(credentialsId: 'github1', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                        sh """
-                            sed -i 's|image: .*|image: prakashpotnuru11/spring-boot-demo:v${BUILD_NUMBER}|' k8s/deployment.yaml
+                sh 'docker build -t prakashpotnuru11/spring-boot-app:latest .'
+                sh 'docker push prakashpotnuru11/spring-boot-app:latest'
+            }
+        }
 
-                            git config user.email "${GIT_USER_EMAIL}"
-                            git config user.name "${GIT_USER_NAME}"
-
-                            git add k8s/deployment.yaml
-                            git commit -m "Updated image to v${BUILD_NUMBER}" || echo "No changes to commit"
-
-                            git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git
-                            git push origin main
-                        """
-                    }
-                }
+        stage('Deploy to Kubernetes with ArgoCD') {
+            steps {
+                sh 'argocd app sync spring-boot-app'
             }
         }
     }
 }
+
