@@ -2,52 +2,53 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB = "prakashpotnuru11"               // DockerHub username
-        IMAGE_NAME = "spring-boot-app"                // Docker image name
-        K8S_APP = "spring-boot-app"                   // ArgoCD application name
-        ARGOCD_URL = "8af64f81b1a4.ngrok-free.app"   // ngrok URL for ArgoCD
-        ARGOCD_USERNAME = "admin"                     // ArgoCD username
-        ARGOCD_PASSWORD = "Admin@123"                 // ArgoCD password
-        SONARQUBE_SERVER = "http://43.205.228.54:9000" // Updated SonarQube URL
-        SONARQUBE_TOKEN = credentials('sonar-token')   // Jenkins secret for Sonar
+        // SonarQube environment variables
+        SONAR_HOST_URL = 'http://43.205.228.54:9000'
+        SONAR_PROJECT_KEY = 'spring-boot-app'
+        // Docker image name
+        DOCKER_IMAGE = 'prakashpotnuru11/spring-boot-app:latest'
+        // Kubernetes/ArgoCD variables
+        ARGOCD_SERVER = 'https://<ARGOCD_SERVER_URL>'
+        ARGOCD_USER = '<ARGOCD_USERNAME>'
+        ARGOCD_PASS = '<ARGOCD_PASSWORD>'
+        ARGOCD_APP_NAME = 'spring-boot-app'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: 'github1', url: 'https://github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git', branch: 'main'
-                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests') {
-                    echo "Checked out Spring Boot app manifests"
-                }
+                echo 'Checking out source code...'
+                git branch: 'main', url: 'https://github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git'
             }
         }
 
-        stage('Build & SonarQube Analysis') {
+        stage('SonarQube Analysis') {
             steps {
-                echo "Building and testing the Spring Boot app..."
+                echo 'Running SonarQube analysis...'
                 dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
-                    sh 'mvn clean install'
-
-                    echo "Running SonarQube code analysis..."
-                    sh """
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=spring-boot-app \
-                        -Dsonar.host.url=$SONARQUBE_SERVER \
-                        -Dsonar.login=$SONARQUBE_TOKEN
-                    """
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh """
+                            mvn clean verify sonar:sonar \
+                            -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+                            -Dsonar.host.url=$SONAR_HOST_URL \
+                            -Dsonar.login=$SONAR_TOKEN
+                        """
+                    }
                 }
             }
         }
 
         stage('Docker Build & Push') {
             steps {
-                echo "Building Docker image and pushing to DockerHub..."
+                echo 'Building Docker image and pushing to DockerHub...'
                 dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
-                    withCredentials([string(credentialsId: 'docker-cred', variable: 'DOCKER_HUB_PASSWORD')]) {
+                    withCredentials([usernamePassword(credentialsId: 'docker-cred', 
+                                                      usernameVariable: 'DOCKER_USER', 
+                                                      passwordVariable: 'DOCKER_PASS')]) {
                         sh """
-                            docker build -t $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER .
-                            docker login -u $DOCKER_HUB -p $DOCKER_HUB_PASSWORD
-                            docker push $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER
+                            docker login -u $DOCKER_USER -p $DOCKER_PASS
+                            docker build -t $DOCKER_IMAGE .
+                            docker push $DOCKER_IMAGE
                         """
                     }
                 }
@@ -56,28 +57,25 @@ pipeline {
 
         stage('Deploy via ArgoCD') {
             steps {
-                echo "Deploying to Kubernetes via ArgoCD..."
-                sh """
-                    argocd login $ARGOCD_URL --insecure --username $ARGOCD_USERNAME --password $ARGOCD_PASSWORD
-                    argocd app set $K8S_APP --image $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER
-                    argocd app sync $K8S_APP --grpc-web
-                """
-            }
-        }
-
-        stage('Deployment Complete') {
-            steps {
-                echo "✅ CI/CD pipeline completed successfully!"
+                echo 'Deploying application via ArgoCD...'
+                withCredentials([usernamePassword(credentialsId: 'argocd-cred', 
+                                                  usernameVariable: 'ARGOCD_USER', 
+                                                  passwordVariable: 'ARGOCD_PASS')]) {
+                    sh """
+                        argocd login $ARGOCD_SERVER --username $ARGOCD_USER --password $ARGOCD_PASS --insecure
+                        argocd app sync $ARGOCD_APP_NAME
+                    """
+                }
             }
         }
     }
 
     post {
-        failure {
-            echo "❌ Pipeline failed! Check logs."
-        }
         success {
-            echo "🎉 Pipeline succeeded!"
+            echo '✅ Pipeline completed successfully!'
+        }
+        failure {
+            echo '❌ Pipeline failed! Check logs.'
         }
     }
 }
