@@ -22,34 +22,34 @@ pipeline {
             }
         }
 
-        stage('Build & Test') {
+        stage('Build & SonarQube Analysis') {
             steps {
                 echo "Building and testing the Spring Boot app..."
-                sh 'mvn clean install'
-            }
-        }
+                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
+                    sh 'mvn clean install'
 
-        stage('SonarQube Analysis') {
-            steps {
-                echo "Running SonarQube code analysis..."
-                sh """
-                    mvn sonar:sonar \
-                    -Dsonar.projectKey=spring-boot-app \
-                    -Dsonar.host.url=$SONARQUBE_SERVER \
-                    -Dsonar.login=$SONARQUBE_TOKEN
-                """
+                    echo "Running SonarQube code analysis..."
+                    sh """
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=spring-boot-app \
+                        -Dsonar.host.url=$SONARQUBE_SERVER \
+                        -Dsonar.login=$SONARQUBE_TOKEN
+                    """
+                }
             }
         }
 
         stage('Docker Build & Push') {
             steps {
                 echo "Building Docker image and pushing to DockerHub..."
-                withCredentials([string(credentialsId: 'docker-cred', variable: 'DOCKER_HUB_PASSWORD')]) {
-                    sh """
-                        docker build -t $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER .
-                        docker login -u $DOCKER_HUB -p $DOCKER_HUB_PASSWORD
-                        docker push $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER
-                    """
+                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
+                    withCredentials([string(credentialsId: 'docker-cred', variable: 'DOCKER_HUB_PASSWORD')]) {
+                        sh """
+                            docker build -t $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER .
+                            docker login -u $DOCKER_HUB -p $DOCKER_HUB_PASSWORD
+                            docker push $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER
+                        """
+                    }
                 }
             }
         }
@@ -81,4 +81,3 @@ pipeline {
         }
     }
 }
-
