@@ -5,7 +5,7 @@ pipeline {
         DOCKER_HUB_CREDENTIALS = 'docker-cred'
         SONAR_TOKEN = 'sonar-token'
         ARGOCD_CREDENTIALS = 'argocd-cred'
-        ARGOCD_SERVER = 'localhost:8080' // port-forward should be active
+        ARGOCD_SERVER = 'ba19422ce41f.ngrok-free.app' // Updated with ngrok URL
     }
 
     stages {
