@@ -2,15 +2,15 @@ pipeline {
     agent any
 
     environment {
-        // SonarQube environment variables
+        // SonarQube
         SONAR_HOST_URL = 'http://43.205.228.54:9000'
         SONAR_PROJECT_KEY = 'spring-boot-app'
-        // Docker image name
+
+        // Docker
         DOCKER_IMAGE = 'prakashpotnuru11/spring-boot-app:latest'
-        // Kubernetes/ArgoCD variables
-        ARGOCD_SERVER = 'https://<ARGOCD_SERVER_URL>'
-        ARGOCD_USER = '<ARGOCD_USERNAME>'
-        ARGOCD_PASS = '<ARGOCD_PASSWORD>'
+
+        // ArgoCD
+        ARGOCD_SERVER = 'https://9585d3102e27.ngrok-free.app'  // your ngrok URL
         ARGOCD_APP_NAME = 'spring-boot-app'
     }
 
@@ -61,10 +61,10 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'argocd-cred', 
                                                   usernameVariable: 'ARGOCD_USER', 
                                                   passwordVariable: 'ARGOCD_PASS')]) {
-                    sh """
+                    sh '''
                         argocd login $ARGOCD_SERVER --username $ARGOCD_USER --password $ARGOCD_PASS --insecure
                         argocd app sync $ARGOCD_APP_NAME
-                    """
+                    '''
                 }
             }
         }
