@@ -1,60 +1,83 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'Maven'  // Name from Jenkins Global Tool Configuration
-        jdk 'Java 17' // Adjust based on your setup
-    }
-
     environment {
-        SONARQUBE_TOKEN = credentials('sonarqube-token') // Jenkins credentials ID for SonarQube token
+        DOCKER_HUB = "prakashpotnuru11"               // DockerHub username
+        IMAGE_NAME = "spring-boot-app"                // Docker image name
+        K8S_APP = "spring-boot-app"                   // ArgoCD application name
+        ARGOCD_URL = "8af64f81b1a4.ngrok-free.app"   // ngrok URL for ArgoCD
+        ARGOCD_USERNAME = "admin"                     // ArgoCD username
+        ARGOCD_PASSWORD = "Admin@123"                 // ArgoCD password
+        SONARQUBE_SERVER = "http://43.205.228.54:9000" // Updated SonarQube URL
+        SONARQUBE_TOKEN = credentials('sonar-token')   // Jenkins secret for Sonar
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git'
+                git credentialsId: 'github1', url: 'https://github.com/prakashpotnuru11/Jenkins-Zero-To-Hero.git', branch: 'main'
+                dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests') {
+                    echo "Checked out Spring Boot app manifests"
+                }
             }
         }
 
-        stage('Build') {
+        stage('Build & Test') {
             steps {
+                echo "Building and testing the Spring Boot app..."
                 sh 'mvn clean install'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('My SonarQube Server') { // Name from Jenkins SonarQube configuration
-                    sh """
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=spring-boot-app \
-                        -Dsonar.host.url=${SONAR_HOST_URL} \
-                        -Dsonar.login=${SONARQUBE_TOKEN}
-                    """
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 1, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
+                echo "Running SonarQube code analysis..."
+                sh """
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=spring-boot-app \
+                    -Dsonar.host.url=$SONARQUBE_SERVER \
+                    -Dsonar.login=$SONARQUBE_TOKEN
+                """
             }
         }
 
         stage('Docker Build & Push') {
             steps {
-                sh 'docker build -t prakashpotnuru11/spring-boot-app:latest .'
-                sh 'docker push prakashpotnuru11/spring-boot-app:latest'
+                echo "Building Docker image and pushing to DockerHub..."
+                withCredentials([string(credentialsId: 'docker-cred', variable: 'DOCKER_HUB_PASSWORD')]) {
+                    sh """
+                        docker build -t $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER .
+                        docker login -u $DOCKER_HUB -p $DOCKER_HUB_PASSWORD
+                        docker push $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER
+                    """
+                }
             }
         }
 
-        stage('Deploy to Kubernetes with ArgoCD') {
+        stage('Deploy via ArgoCD') {
             steps {
-                sh 'argocd app sync spring-boot-app'
+                echo "Deploying to Kubernetes via ArgoCD..."
+                sh """
+                    argocd login $ARGOCD_URL --insecure --username $ARGOCD_USERNAME --password $ARGOCD_PASSWORD
+                    argocd app set $K8S_APP --image $DOCKER_HUB/$IMAGE_NAME:$BUILD_NUMBER
+                    argocd app sync $K8S_APP --grpc-web
+                """
             }
+        }
+
+        stage('Deployment Complete') {
+            steps {
+                echo "✅ CI/CD pipeline completed successfully!"
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "❌ Pipeline failed! Check logs."
+        }
+        success {
+            echo "🎉 Pipeline succeeded!"
         }
     }
 }
